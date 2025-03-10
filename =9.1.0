@@ -1,0 +1,101 @@
+yarn add v1.23.0-20200615.1913
+[1/4] Resolving packages...
+[2/4] Fetching packages...
+info @nomicfoundation/solidity-analyzer-darwin-arm64@0.1.1: The platform "win32" is incompatible with this module.
+info "@nomicfoundation/solidity-analyzer-darwin-arm64@0.1.1" is an optional dependency and failed compatibility check. Excluding it from installation.
+info @nomicfoundation/solidity-analyzer-darwin-arm64@0.1.1: The CPU architecture "x64" is incompatible with this module.
+info @nomicfoundation/solidity-analyzer-darwin-x64@0.1.1: The platform "win32" is incompatible with this module.
+info "@nomicfoundation/solidity-analyzer-darwin-x64@0.1.1" is an optional dependency and failed compatibility check. Excluding it from installation.
+info @nomicfoundation/solidity-analyzer-freebsd-x64@0.1.1: The platform "win32" is incompatible with this module.
+info "@nomicfoundation/solidity-analyzer-freebsd-x64@0.1.1" is an optional dependency and failed compatibility check. Excluding it from installation.
+info @nomicfoundation/solidity-analyzer-linux-arm64-gnu@0.1.1: The platform "win32" is incompatible with this module.
+info "@nomicfoundation/solidity-analyzer-linux-arm64-gnu@0.1.1" is an optional dependency and failed compatibility check. Excluding it from installation.
+info @nomicfoundation/solidity-analyzer-linux-arm64-gnu@0.1.1: The CPU architecture "x64" is incompatible with this module.
+info @nomicfoundation/solidity-analyzer-linux-arm64-musl@0.1.1: The platform "win32" is incompatible with this module.
+info "@nomicfoundation/solidity-analyzer-linux-arm64-musl@0.1.1" is an optional dependency and failed compatibility check. Excluding it from installation.
+info @nomicfoundation/solidity-analyzer-linux-arm64-musl@0.1.1: The CPU architecture "x64" is incompatible with this module.
+info @nomicfoundation/solidity-analyzer-linux-x64-gnu@0.1.1: The platform "win32" is incompatible with this module.
+info "@nomicfoundation/solidity-analyzer-linux-x64-gnu@0.1.1" is an optional dependency and failed compatibility check. Excluding it from installation.
+info @nomicfoundation/solidity-analyzer-linux-x64-musl@0.1.1: The platform "win32" is incompatible with this module.
+info "@nomicfoundation/solidity-analyzer-linux-x64-musl@0.1.1" is an optional dependency and failed compatibility check. Excluding it from installation.
+info @nomicfoundation/solidity-analyzer-win32-arm64-msvc@0.1.1: The CPU architecture "x64" is incompatible with this module.
+info "@nomicfoundation/solidity-analyzer-win32-arm64-msvc@0.1.1" is an optional dependency and failed compatibility check. Excluding it from installation.
+info @nomicfoundation/solidity-analyzer-win32-ia32-msvc@0.1.1: The CPU architecture "x64" is incompatible with this module.
+info "@nomicfoundation/solidity-analyzer-win32-ia32-msvc@0.1.1" is an optional dependency and failed compatibility check. Excluding it from installation.
+info fsevents@2.3.3: The platform "win32" is incompatible with this module.
+info "fsevents@2.3.3" is an optional dependency and failed compatibility check. Excluding it from installation.
+[3/4] Linking dependencies...
+[4/4] Building fresh packages...
+success Saved lockfile.
+success Saved 57 new dependencies.
+info Direct dependencies
+├─ @nomicfoundation/hardhat-chai-matchers@2.0.8
+├─ @nomicfoundation/hardhat-ethers@3.0.8
+├─ @nomicfoundation/hardhat-ignition-ethers@0.15.9
+├─ @nomicfoundation/hardhat-network-helpers@1.0.12
+├─ @nomicfoundation/hardhat-verify@2.0.12
+├─ @typechain/ethers-v6@0.5.1
+├─ @typechain/hardhat@9.1.0
+├─ @types/chai@4.3.20
+├─ @types/mocha@10.0.10
+├─ hardhat-gas-reporter@1.0.10
+└─ typechain@8.3.2
+info All dependencies
+├─ @nomicfoundation/hardhat-chai-matchers@2.0.8
+├─ @nomicfoundation/hardhat-ethers@3.0.8
+├─ @nomicfoundation/hardhat-ignition-ethers@0.15.9
+├─ @nomicfoundation/hardhat-network-helpers@1.0.12
+├─ @nomicfoundation/hardhat-verify@2.0.12
+├─ @typechain/ethers-v6@0.5.1
+├─ @typechain/hardhat@9.1.0
+├─ @types/chai-as-promised@7.1.8
+├─ @types/chai@4.3.20
+├─ @types/concat-stream@1.6.1
+├─ @types/deep-eql@4.0.2
+├─ @types/form-data@0.0.33
+├─ @types/mocha@10.0.10
+├─ @types/prettier@2.7.3
+├─ antlr4ts@0.5.0-alpha.4
+├─ array-back@3.1.0
+├─ array-uniq@1.0.3
+├─ asap@2.0.6
+├─ at-least-node@1.0.0
+├─ cbor@8.1.0
+├─ chai-as-promised@7.1.2
+├─ charenc@0.0.2
+├─ cli-table3@0.5.1
+├─ command-line-args@5.2.1
+├─ command-line-usage@6.1.3
+├─ concat-stream@1.6.2
+├─ core-util-is@1.0.3
+├─ crypt@0.0.2
+├─ deep-eql@4.1.4
+├─ eth-gas-reporter@0.2.27
+├─ find-replace@3.0.0
+├─ fs-readdir-recursive@1.1.0
+├─ get-port@3.2.0
+├─ hardhat-gas-reporter@1.0.10
+├─ http-basic@8.1.3
+├─ isarray@1.0.0
+├─ lodash.camelcase@4.3.0
+├─ lodash.clonedeep@4.5.0
+├─ lodash.isequal@4.5.0
+├─ markdown-table@1.1.3
+├─ ordinal@1.0.3
+├─ parse-cache-control@1.0.1
+├─ process-nextick-args@2.0.1
+├─ promise@8.3.0
+├─ proxy-from-env@1.1.0
+├─ reduce-flatten@2.0.0
+├─ req-cwd@2.0.0
+├─ req-from@2.0.0
+├─ string-format@2.0.0
+├─ sync-request@6.1.0
+├─ sync-rpc@1.3.6
+├─ table-layout@1.0.2
+├─ then-request@6.0.2
+├─ ts-command-line-args@2.5.1
+├─ typechain@8.3.2
+├─ typedarray@0.0.6
+└─ wordwrapjs@4.0.1
+Done in 37.41s.
