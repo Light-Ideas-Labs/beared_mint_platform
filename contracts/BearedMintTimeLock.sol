@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import "@openzeppelin/contracts/access/AccessControl.sol";
+
 /**
- * @title BearedMintTimelock
+ * @title BearedMintTimeLock
  * @notice Timelock contract for admin functions in BearedMint
  */
-contract BearedMintTimelock {
+contract BearedMintTimelock is AccessControl {
 
     event QueueTransaction(bytes32 indexed txHash, address indexed target, uint256 value, string signature, bytes data, uint256 eta);
     event ExecuteTransaction(bytes32 indexed txHash, address indexed target, uint256 value, string signature, bytes data, uint256 eta);
@@ -20,20 +22,20 @@ contract BearedMintTimelock {
 
     mapping(bytes32 => bool) public queuedTransactions;
 
+    modifier onlyAdmin() {
+        require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "Caller must be admin");
+        _;
+    }
+
     constructor(address admin_, uint256 delay_) {
         require(delay_ >= MINIMUM_DELAY, "Delay must exceed minimum delay");
         require(delay_ <= MAXIMUM_DELAY, "Delay must not exceed maximum delay");
         require(admin_ != address(0), "Invalid admin address");
-
-        admin = admin_;
+        
+        _grantRole(DEFAULT_ADMIN_ROLE, admin_);
         delay = delay_;
     }
-
-    modifier onlyAdmin() {
-        require(msg.sender == admin, "Caller must be admin");
-        _;
-    }
-
+    
     /**
      * @notice Queue a transaction with a delay
      * @param target The address of the contract to call

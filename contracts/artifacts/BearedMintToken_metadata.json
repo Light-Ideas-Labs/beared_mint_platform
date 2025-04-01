@@ -23,7 +23,7 @@
 						"type": "address"
 					}
 				],
-				"stateMutability": "nonpayable",
+				"stateMutability": "payable",
 				"type": "constructor"
 			},
 			{
@@ -212,6 +212,31 @@
 				"anonymous": false,
 				"inputs": [
 					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "timestamp",
+						"type": "uint256"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "newPriceImpact",
+						"type": "uint256"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "newBondingCurveFactor",
+						"type": "uint256"
+					}
+				],
+				"name": "AIParametersUpdated",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
 						"indexed": true,
 						"internalType": "address",
 						"name": "owner",
@@ -363,6 +388,25 @@
 					}
 				],
 				"name": "RoleRevoked",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "timestamp",
+						"type": "uint256"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "newScore",
+						"type": "uint256"
+					}
+				],
+				"name": "SocialImpactUpdated",
 				"type": "event"
 			},
 			{
@@ -577,6 +621,19 @@
 			},
 			{
 				"inputs": [],
+				"name": "MAX_CONCURRENT_USERS",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
 				"name": "MAX_PURCHASE",
 				"outputs": [
 					{
@@ -693,6 +750,32 @@
 						"internalType": "uint256",
 						"name": "",
 						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "activeUserCount",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "aiController",
+				"outputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
 					}
 				],
 				"stateMutability": "view",
@@ -868,6 +951,39 @@
 				"type": "function"
 			},
 			{
+				"inputs": [],
+				"name": "getGrowthMetrics",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "uniqueHolders",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "totalTransactions",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "communityEngagementScore",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "socialImpactScore",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "lastUpdateTimestamp",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
 				"inputs": [
 					{
 						"internalType": "bytes32",
@@ -905,6 +1021,39 @@
 				"type": "function"
 			},
 			{
+				"inputs": [],
+				"name": "growthMetrics",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "uniqueHolders",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "totalTransactions",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "communityEngagementScore",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "socialImpactScore",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "lastUpdateTimestamp",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
 				"inputs": [
 					{
 						"internalType": "bytes32",
@@ -918,6 +1067,25 @@
 					}
 				],
 				"name": "hasRole",
+				"outputs": [
+					{
+						"internalType": "bool",
+						"name": "",
+						"type": "bool"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"name": "isActiveUser",
 				"outputs": [
 					{
 						"internalType": "bool",
@@ -1231,6 +1399,37 @@
 				"type": "function"
 			},
 			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "newPriceImpact",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "newBondingCurveFactor",
+						"type": "uint256"
+					}
+				],
+				"name": "updateAIParameters",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "newScore",
+						"type": "uint256"
+					}
+				],
+				"name": "updateSocialImpactScore",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
 				"inputs": [],
 				"name": "virtualEthReserve",
 				"outputs": [
@@ -1477,11 +1676,17 @@
 				"transferFrom(address,address,uint256)": {
 					"details": "See {IERC20-transferFrom}. Skips emitting an {Approval} event indicating an allowance update. This is not required by the ERC. See {xref-ERC20-_approve-address-address-uint256-bool-}[_approve]. NOTE: Does not update the allowance if the current allowance is the maximum `uint256`. Requirements: - `from` and `to` cannot be the zero address. - `from` must have a balance of at least `value`. - the caller must have allowance for ``from``'s tokens of at least `value`."
 				},
+				"updateAIParameters(uint256,uint256)": {
+					"details": "Can only be called by AI controller"
+				},
+				"updateSocialImpactScore(uint256)": {
+					"details": "Can only be called by admin"
+				},
 				"withdrawFees()": {
 					"details": "Only callable by admin after migration"
 				}
 			},
-			"title": "BearedMintToken",
+			"title": "BearedMintToken ",
 			"version": 1
 		},
 		"userdoc": {
@@ -1494,7 +1699,7 @@
 					"notice": "Calculate price impact of a trade"
 				},
 				"calculatePurchaseReturn(uint256)": {
-					"notice": "Calculate the number of tokens to mint based on ETH sent (Bonding Curve Logic)"
+					"notice": "Calculate the number of tokens to mint based on ETH sent"
 				},
 				"calculateSaleReturn(uint256)": {
 					"notice": "Calculate the ETH amount returned when selling tokens"
@@ -1505,11 +1710,20 @@
 				"emergencyWithdraw()": {
 					"notice": "Emergency withdrawal in case of critical issues"
 				},
+				"getGrowthMetrics()": {
+					"notice": "Get current growth metrics"
+				},
 				"sell(uint256)": {
 					"notice": "Sell tokens back to the contract"
 				},
 				"setEmergencyMode(bool)": {
 					"notice": "Set emergency mode"
+				},
+				"updateAIParameters(uint256,uint256)": {
+					"notice": "Update AI parameters"
+				},
+				"updateSocialImpactScore(uint256)": {
+					"notice": "Update social impact score"
 				},
 				"withdrawFees()": {
 					"notice": "Withdraw accumulated fees post-migration"
@@ -1685,11 +1899,11 @@
 			]
 		},
 		"contracts/BearedMintToken.sol": {
-			"keccak256": "0x286998589cceeacb0d6bebefa7a97fb2e8839e1c4b9389f83125d167e93cd8c3",
+			"keccak256": "0x5f0410adc97f07c9a353e0411909f6d2c4327755748f8b8c970023dc02c1bdff",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://f8c2f4dc828156eefdba0e7e73fbb213e1dc2ff54a6410fd9a93f09f2e4623be",
-				"dweb:/ipfs/QmXqYruszqXSCw9AMpurgPWV63WqhgHjCujjdgNnA22X9J"
+				"bzz-raw://76965ba27316e41f8e3ee87f02bd48d8b02d7ae2062584e26de71959f81a48a3",
+				"dweb:/ipfs/QmPYyKZgfhu1bA5orvA3H9EcN3MvwJURXmft3ZyQCNKpzg"
 			]
 		}
 	},

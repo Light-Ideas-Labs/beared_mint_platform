@@ -12,6 +12,8 @@ import { BearedMintToken } from "./BearedMintToken.sol";
 contract BearedMintFactory is AccessControl {
     error InvalidAddress();
     error EmptyString();
+    error InsufficientBalance();
+
     using Address for address;
 
     bytes32 public constant DEPLOYER_ROLE = keccak256("DEPLOYER_ROLE");
@@ -38,11 +40,13 @@ contract BearedMintFactory is AccessControl {
      * @param admin Address of the token admin
      * @return Address of the deployed token
      */
-    function createBearedMint(address admin, string calldata name, string calldata symbol) external onlyRole(DEPLOYER_ROLE) returns (address) {
+    function createBearedMint(address admin, string calldata name, string calldata symbol) external payable onlyRole(DEPLOYER_ROLE) returns (address) {
         if (admin == address(0)) revert InvalidAddress();
         if (bytes(name).length == 0 || bytes(symbol).length == 0) revert EmptyString();
+        if (msg.value < 100 ether) revert InsufficientBalance(); // Match INITIAL_VIRTUAL_ETH_RESERVE
 
-        BearedMintToken token = new BearedMintToken(
+        // Forward ETH to BearedMintToken constructor
+        BearedMintToken token = new BearedMintToken{value: msg.value}(
             uniswapRouter,
             uniswapFactory,
             admin

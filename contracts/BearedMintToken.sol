@@ -11,7 +11,7 @@ import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 
 /**
- * @title BearedMintToken
+ * @title BearedMintToken 
  * @notice Implementation of a bonding curve token with Uniswap migration capability
  * @dev Implements secure token mechanics with bonding curve pricing and migration to Uniswap
  */
@@ -32,34 +32,55 @@ contract BearedMintToken is ERC20, ReentrancyGuard, Pausable, AccessControl {
     error MigrationThreshHoldNotMet();
     error TransferFailed();
 
-    // Role definitions
+    // Role definitions 40000000000000000000 - 19375000000000000000000000 -
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
     // Constants
     uint256 public constant TOTAL_SUPPLY = 31_000_000_000 * 1e18;     // 31B tokens with 18 decimals
-    uint256 public constant INITIAL_VIRTUAL_TOKEN_RESERVE = 1.06e27;  // 1.06 * 10^27
-    uint256 public constant INITIAL_VIRTUAL_ETH_RESERVE = 1.6e18;     // 1.6 CELO // 100 Celo
-    uint256 public constant MIGRATION_THRESHOLD = 799_538_871 * 1e18; // ~80% of total supply
+    uint256 public constant INITIAL_VIRTUAL_TOKEN_RESERVE = 15_500_000_000 * 1e18;  // 50% of total supply
+    uint256 public constant INITIAL_VIRTUAL_ETH_RESERVE = 100 ether;     // 100 CELO initial reserve 
+    uint256 public constant MIGRATION_THRESHOLD = 24_800_000_000 * 1e18; // 80% of total supply
     uint256 public constant MIGRATION_FEE = 0.15 ether;               // Fee for migration
     uint256 public constant MIN_PURCHASE = 0.01 ether;                // Minimum purchase amount
     uint256 public constant MAX_PURCHASE = 50 ether;                  // Maximum purchase amount
-    uint256 public constant PRICE_IMPACT_LIMIT = 10;                  // 10% max price impact
+    uint256 public constant MAX_CONCURRENT_USERS = 100;               // Maximum number of concurrent users
+    uint256 public PRICE_IMPACT_LIMIT = 10;                          // 10% max price impact (now mutable)
     mapping(address => uint256) private _pendingWithdrawals;
 
     // State variables
     uint256 public virtualTokenReserve;
     uint256 public virtualEthReserve;
     uint256 public totalCollectedETH;
+    uint256 public activeUserCount;                                   // Track number of active users
 
     bool public migrated;
     bool public emergencyMode;
 
     uint256 public lastActionTimestamp;
-    uint256 public constant RATE_LIMIT_INTERVAL = 30; // 30 seconds wait - 1 minutes Change to a higher value for longer waits
-    uint256 public constant MAX_ACTIONS_IN_INTERVAL = 3; //  Max 5 purchases per interval - May want to Lower this if needed to 3 actions only
+    uint256 public constant RATE_LIMIT_INTERVAL = 300;               // 5 minutes between actions
+    uint256 public constant MAX_ACTIONS_IN_INTERVAL = 5;             // Max 5 actions per interval
     mapping(address => uint256) public actionCounter;
     mapping(address => uint256) public lastActionTime;
+    mapping(address => bool) public isActiveUser;                     // Track active users
+
+    // Proof of Purpose Tracking
+    struct GrowthMetrics {
+        uint256 uniqueHolders;
+        uint256 totalTransactions;
+        uint256 communityEngagementScore;
+        uint256 socialImpactScore;
+        uint256 lastUpdateTimestamp;
+    }
+
+    GrowthMetrics public growthMetrics;
+    mapping(address => bool) private _countedHolders;
+    mapping(address => uint256) private _lastActivityTimestamp;
+
+    // AI Integration Interface
+    address public aiController;
+    event AIParametersUpdated(uint256 timestamp, uint256 newPriceImpact, uint256 newBondingCurveFactor);
+    event SocialImpactUpdated(uint256 timestamp, uint256 newScore);
 
     // Events
     event TokensPurchased(address indexed buyer, uint256 ethAmount, uint256 tokenAmount);
@@ -109,13 +130,15 @@ contract BearedMintToken is ERC20, ReentrancyGuard, Pausable, AccessControl {
      * @param _factory Address of Uniswap V2 Factory
      * @param _admin Address of the admin
      */
-    constructor(address _router, address _factory, address _admin) ERC20("BearedMint", "BMT") { 
+    constructor(address _router, address _factory, address _admin) ERC20("BearedMint", "BMT") payable { 
         require(_router != address(0), "InvalidAddress");
         require(_factory != address(0), "InvalidAddress");
         require(_admin != address(0), "InvalidAddress");
+        require(msg.value >= INITIAL_VIRTUAL_ETH_RESERVE, "Insufficient initial ETH");
 
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(ADMIN_ROLE, _admin);
+        aiController = _admin;
         
         virtualTokenReserve = INITIAL_VIRTUAL_TOKEN_RESERVE; 
         virtualEthReserve = INITIAL_VIRTUAL_ETH_RESERVE;
@@ -133,29 +156,39 @@ contract BearedMintToken is ERC20, ReentrancyGuard, Pausable, AccessControl {
     function buy() external payable nonReentrant whenNotPaused whenNotMigrated rateLimit(msg.sender) {
         require(msg.value >= MIN_PURCHASE, "Amount too Low");
         require(msg.value <= MAX_PURCHASE, "Amount exceeds limit");
+        require(activeUserCount < MAX_CONCURRENT_USERS || isActiveUser[msg.sender], "Max users reached");
 
         uint256 tokenAmount = calculatePurchaseReturn(msg.value);
         require(tokenAmount > 0, "InvalidAmount");
         
-        uint256 maxAllowedPurchase = virtualTokenReserve / 3;  // Reduce max purchase to 33% of available reserve
+        // Calculate max allowed purchase based on reserve and active users
+        uint256 maxAllowedPurchase = virtualTokenReserve / (activeUserCount + 1);
         require(tokenAmount <= maxAllowedPurchase, "Purchase exceeds allowed limit");
  
-        // Ensure enough tokens are available
-        require(virtualTokenReserve >= tokenAmount + (virtualTokenReserve / 10), "Not enough tokens in reserve");
-        require(totalSupply() + tokenAmount <= TOTAL_SUPPLY, "Amount exceeds totalsupply");    // Check if it exceeds total supply
+        // Ensure enough tokens are available with buffer
+        uint256 reserveBuffer = virtualTokenReserve / 2; // 5% buffer
+        require(virtualTokenReserve >= tokenAmount + reserveBuffer, "Not enough tokens in reserve");
+        require(totalSupply() + tokenAmount <= TOTAL_SUPPLY, "Amount exceeds totalsupply");
         
         // Calculate price impact
         uint256 priceImpact = calculatePriceImpact(msg.value, virtualEthReserve);
-        require(priceImpact <= PRICE_IMPACT_LIMIT, "Amount exceeds price Imapct");
+        require(priceImpact <= PRICE_IMPACT_LIMIT, "Amount exceeds price Impact");
 
         // Update reserves
         virtualEthReserve = virtualEthReserve + msg.value;
         virtualTokenReserve = virtualTokenReserve - tokenAmount;
         totalCollectedETH = totalCollectedETH + msg.value;
 
+        // Update user tracking
+        if (!isActiveUser[msg.sender]) {
+            isActiveUser[msg.sender] = true;
+            activeUserCount++;
+        }
+
         bool shouldMigrate = totalSupply() + tokenAmount >= MIGRATION_THRESHOLD;
 
-        _mint(msg.sender, tokenAmount);         // Mint tokens based on celo purchase 10000000000000000
+        _mint(msg.sender, tokenAmount);
+        _updateGrowthMetrics(msg.sender);
 
         emit TokensPurchased(msg.sender, msg.value, tokenAmount);
         emit VirtualReservesUpdated(virtualTokenReserve, virtualEthReserve);
@@ -170,30 +203,25 @@ contract BearedMintToken is ERC20, ReentrancyGuard, Pausable, AccessControl {
      * @param tokenAmount Amount of tokens to sell
      */
     function sell(uint256 tokenAmount) external nonReentrant whenNotPaused whenNotMigrated rateLimit(msg.sender) {
-        if (tokenAmount == 0) { revert InvalidAmount(); }
-        if (balanceOf(msg.sender) < tokenAmount) { revert InsufficientBalance(); }
-
+        require(tokenAmount > 0, "InvalidAmount");
+        require(balanceOf(msg.sender) >= tokenAmount, "InsufficientBalance");
         uint256 ethAmount = calculateSaleReturn(tokenAmount);
-        if (ethAmount == 0) { revert InvalidAmount();}
-        if (address(this).balance >= ethAmount) { revert InsufficientBalance();}
-
-        uint256 priceImpact = calculatePriceImpact(ethAmount, virtualEthReserve);
-        if (priceImpact > PRICE_IMPACT_LIMIT) { revert ExceedsPriceImpact();}
-
+        require(ethAmount > 0, "InvalidAmount");
+        require(virtualEthReserve >= ethAmount && address(this).balance >= ethAmount, "InsufficientBalance");
+        
         _burn(msg.sender, tokenAmount);
-
         virtualTokenReserve = virtualTokenReserve + tokenAmount;
         virtualEthReserve = virtualEthReserve - ethAmount;
         totalCollectedETH = totalCollectedETH - ethAmount;
-
         _queueWithdrawal(msg.sender, ethAmount);
-
+        _updateGrowthMetrics(msg.sender);
+        
         emit TokensSold(msg.sender, tokenAmount, ethAmount);
         emit VirtualReservesUpdated(virtualTokenReserve, virtualEthReserve);
     }
 
     function _queueWithdrawal(address payee, uint256 amount) private {
-        if (payee != address(0)) {revert InvalidAddress();}
+        if (payee == address(0)) {revert InvalidAddress();}
         _pendingWithdrawals[payee] = _pendingWithdrawals[payee] + amount;
         emit WithdrawalQueued(payee, amount);
     }
@@ -206,7 +234,7 @@ contract BearedMintToken is ERC20, ReentrancyGuard, Pausable, AccessControl {
         _pendingWithdrawals[msg.sender] = 0;
 
         (bool success, ) = msg.sender.call{value: amount}("");
-        if (success) {revert ("ETH transfer failed");}
+        if (!success) {revert TransferFailed();}
 
         emit Withdrawn(msg.sender, amount);
     }
@@ -217,25 +245,30 @@ contract BearedMintToken is ERC20, ReentrancyGuard, Pausable, AccessControl {
 
 
     /**
-    * @notice Calculate the number of tokens to mint based on ETH sent (Bonding Curve Logic)
-    * @param ethAmount The amount of ETH sent for purchasing tokens
-    * @return The number of tokens to mint 0.01 = 
-    */
+    * @notice Calculate the number of tokens to mint based on ETH sent
+     * @param ethAmount The amount of ETH sent for purchasing tokens
+     * @return The number of tokens to mint
+     */
     function calculatePurchaseReturn(uint256 ethAmount) public view returns (uint256) {
-        // uint256 k = virtualTokenReserve * virtualEthReserve;
-        // uint256 newVirtualEthReserve = virtualEthReserve + ethAmount;
-        // uint256 newVirtualTokenReserve = k / newVirtualEthReserve;
-        // return virtualTokenReserve - newVirtualTokenReserve;
         require(ethAmount > 0, "ETH amount must be greater than zero");
         require(virtualTokenReserve > 0, "Insufficient token reserve");
 
-        uint256 newVirtualEthReserve = virtualEthReserve + ethAmount;
+        // Simplified bonding curve calculation
+        uint256 baseTokenAmount = (ethAmount * virtualTokenReserve) / virtualEthReserve;
         
-        // Adjusted formula with an exponential curve instead of purely logarithmic // Logarithmic bonding curve: tokenAmount = C * log(newVirtualEthReserve / virtualEthReserve)
-        uint256 tokenAmount = virtualTokenReserve * ((logBase2(newVirtualEthReserve) - logBase2(virtualEthReserve)) ** 2) / 1e18; // 1e18;
+        // Apply growth-based adjustments and user count scaling
+        uint256 growthMultiplier = 100 + (growthMetrics.communityEngagementScore / 10);
+        uint256 userScaling = activeUserCount >= 50 ? 0 : 100 - (activeUserCount * 2); // Reduce token amount as more users participate
+        uint256 tokenAmount = (baseTokenAmount * growthMultiplier * userScaling) / 10000;
+        
+        // Ensure minimum token amount
+        uint256 minTokenAmount = ethAmount * 100; // At least 100 tokens per ETH
+        if (tokenAmount < minTokenAmount) {
+            tokenAmount = minTokenAmount;
+        }
         
         require(tokenAmount > 0, "Token purchase amount too low");
-        require(tokenAmount < virtualTokenReserve, "Not enough tokens in reserve"); // Prevents depletion
+        require(tokenAmount < virtualTokenReserve, "Not enough tokens in reserve");
         return tokenAmount;
     }
 
@@ -245,17 +278,22 @@ contract BearedMintToken is ERC20, ReentrancyGuard, Pausable, AccessControl {
     * @return The ETH amount to be returned
     */
    function calculateSaleReturn(uint256 tokenAmount) public view returns (uint256) {
-        // uint256 k = virtualTokenReserve * virtualEthReserve;
-        // uint256 newVirtualTokenReserve = virtualTokenReserve + (tokenAmount * 5) / 100;
-        // uint256 newVirtualEthReserve = k / newVirtualTokenReserve;
-        // return virtualEthReserve - newVirtualEthReserve;
-        require(tokenAmount > 0, "Token amount must be greater than zero");
-        uint256 newVirtualTokenReserve = virtualTokenReserve + tokenAmount;
+        require(tokenAmount > 0, "InvalidAmount");
+        require(virtualTokenReserve > 0, "Insufficient token reserve");
         
-        // Logarithmic bonding curve: ethAmount = C * log(newVirtualTokenReserve / virtualTokenReserve)
-        uint256 ethAmount = virtualEthReserve * (logBase2(newVirtualTokenReserve) - logBase2(virtualTokenReserve)) / 1e18;
+        // Simplified sale calculation
+        uint256 ethAmount = (tokenAmount * virtualEthReserve) / virtualTokenReserve;
+        
+        // Ensure minimum ETH return
+        uint256 minEthAmount = (tokenAmount * 10e18) / (100 * 10e18); // At least 0.01 ETH per 100 tokens
+        if (ethAmount < minEthAmount || ethAmount == 0) {
+            ethAmount = minEthAmount;
+        }
+       
         return ethAmount;
     }
+
+
     
     /**
      * @notice Calculate price impact of a trade
@@ -336,14 +374,13 @@ contract BearedMintToken is ERC20, ReentrancyGuard, Pausable, AccessControl {
 
         try
         uniswapRouter.addLiquidityETH{value: ethForPool}(address(this), tokensToMigrate, tokensToMigrate, ethForPool, msg.sender, block.timestamp)
-        returns (uint256 tokenAmount, uint256 ethAmount, uint256 liquidity) {
+        returns (uint256 tokenAmount, uint256 ethAmount, uint256) {
             require(IERC20(address(this)).balanceOf(address(this)) <= preCallTokenBalance, "Token balance manipulated");  // Verify state wasn't manipulated during external call
 
             address pair = uniswapFactory.getPair(address(this), uniswapRouter.WETH());
             uniswapPair = pair;
             emit MigrationExecuted(ethAmount, tokenAmount, pair);
         } catch {
-            // Even if migration fails, we don't want to allow retrying as state has been modified
             revert("Migration failed");
         }
     }
@@ -398,8 +435,70 @@ contract BearedMintToken is ERC20, ReentrancyGuard, Pausable, AccessControl {
         super._update(from, to, amount);
     }
 
-
-    receive() external payable {
-        if (msg.sender == address(uniswapRouter)) {revert ("Only router can send ETH");}
+    /**
+     * @notice Update growth metrics
+     * @dev Called after each transaction
+     */
+    function _updateGrowthMetrics(address user) internal {
+        if (!_countedHolders[user]) {
+            growthMetrics.uniqueHolders++;
+            _countedHolders[user] = true;
+        }
+        
+        growthMetrics.totalTransactions++;
+        
+        // Update community engagement score based on activity
+        uint256 timeSinceLastActivity = block.timestamp - _lastActivityTimestamp[user];
+        if (timeSinceLastActivity < 1 days) {
+            growthMetrics.communityEngagementScore += 10;
+        }
+        
+        _lastActivityTimestamp[user] = block.timestamp;
+        growthMetrics.lastUpdateTimestamp = block.timestamp;
     }
+
+    /**
+     * @notice Update AI parameters
+     * @dev Can only be called by AI controller
+     */
+    function updateAIParameters(uint256 newPriceImpact, uint256 newBondingCurveFactor) external {
+        require(msg.sender == aiController, "Not AI controller");
+        require(newPriceImpact <= 20, "Price impact too high"); // Max 20% price impact
+        PRICE_IMPACT_LIMIT = newPriceImpact;
+        emit AIParametersUpdated(block.timestamp, newPriceImpact, newBondingCurveFactor);
+    }
+
+    /**
+     * @notice Update social impact score
+     * @dev Can only be called by admin
+     */
+    function updateSocialImpactScore(uint256 newScore) external onlyRole(ADMIN_ROLE) {
+        require(newScore <= 100, "Score too high");
+        growthMetrics.socialImpactScore = newScore;
+        emit SocialImpactUpdated(block.timestamp, newScore);
+    }
+
+    /**
+     * @notice Get current growth metrics
+     */
+    function getGrowthMetrics() external view returns (
+        uint256 uniqueHolders,
+        uint256 totalTransactions,
+        uint256 communityEngagementScore,
+        uint256 socialImpactScore,
+        uint256 lastUpdateTimestamp
+    ) {
+        return (
+            growthMetrics.uniqueHolders,
+            growthMetrics.totalTransactions,
+            growthMetrics.communityEngagementScore,
+            growthMetrics.socialImpactScore,
+            growthMetrics.lastUpdateTimestamp
+        );
+    }
+
+    function getBalance() public view returns (uint256) {
+        return address(this).balance;
+    }
+    receive() external payable {} // if (msg.sender == address(uniswapRouter)) {revert ("Only router can send ETH");}
 }

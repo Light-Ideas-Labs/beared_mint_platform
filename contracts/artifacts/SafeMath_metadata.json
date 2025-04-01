@@ -1,0 +1,45 @@
+{
+	"compiler": {
+		"version": "0.8.26+commit.8a97fa7a"
+	},
+	"language": "Solidity",
+	"output": {
+		"abi": [],
+		"devdoc": {
+			"kind": "dev",
+			"methods": {},
+			"version": 1
+		},
+		"userdoc": {
+			"kind": "user",
+			"methods": {},
+			"version": 1
+		}
+	},
+	"settings": {
+		"compilationTarget": {
+			"contracts/BearedMintCore.sol": "SafeMath"
+		},
+		"evmVersion": "cancun",
+		"libraries": {},
+		"metadata": {
+			"bytecodeHash": "ipfs"
+		},
+		"optimizer": {
+			"enabled": false,
+			"runs": 200
+		},
+		"remappings": []
+	},
+	"sources": {
+		"contracts/BearedMintCore.sol": {
+			"keccak256": "0xbba62a404d64f7a21bba0af1e068907da8f8bd2c69c3a0945f80361a9c75e485",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://4af82bcafbae036994fd98be19e0b2846dbfd9d56e08e1b5499dabcdd04fa1d5",
+				"dweb:/ipfs/QmPss9HcZLMaWahaTrR8hhYRVw4baUJJt1LmX4W6tRT6Ts"
+			]
+		}
+	},
+	"version": 1
+}
