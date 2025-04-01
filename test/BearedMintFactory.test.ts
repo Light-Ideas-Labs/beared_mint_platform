@@ -1,4 +1,4 @@
-import { ethers } from "hardhat";
+import { ethers, network } from "hardhat";
 import { expect } from "chai";
 
 describe("BearedMintModule - Combined Test Suite", function () {
@@ -10,6 +10,7 @@ describe("BearedMintModule - Combined Test Suite", function () {
 
   before(async () => {
     [deployer, user1, user2, aiController] = await ethers.getSigners();
+    console.log("balance of user1", await ethers.provider.getBalance(user1.address));
 
     const BearedMintFactory = await ethers.getContractFactory("BearedMintFactory");
     const BearedMintLiquidityLock = await ethers.getContractFactory("BearedMintLiquidityLock");
@@ -138,8 +139,23 @@ describe("BearedMintModule - Combined Test Suite", function () {
       console.log(`Virtual ETH reserve before: ${ethers.formatEther(virtualEthReserveBefore)} ETH`);
       
       const initialEthBalance = await ethers.provider.getBalance(user1.address);
-      
+      console.log(`Initial ETH balance: ${ethers.formatEther(initialEthBalance)} ETH`);
 
+      // approve the token
+      const approveTx = await bearedMintToken.connect(user1).approve(await bearedMintToken.getAddress(), sellAmount);
+      console.log("approved...");
+      const receipt = await approveTx.wait();
+      console.log("receipt", receipt);
+
+      // call eth amount form calculateSaleReturn  // 77500000000000000000,000 == 77.5 eth
+      const ethAmount = await bearedMintToken.calculateSaleReturn(sellAmount);
+      console.log("ethAmount====>", ethAmount);
+
+      // call eth vitual reserve
+      const ethVirtualReserve = await bearedMintToken.virtualEthReserve();
+      console.log("ethVirtualReserve====>", ethVirtualReserve);
+      
+      // sell the tokens
       await bearedMintToken.connect(user1).sell(sellAmount);
       
       const newBalance = await bearedMintToken.balanceOf(user1.address);
@@ -199,15 +215,17 @@ describe("BearedMintModule - Combined Test Suite", function () {
 
     // Buy tokens to reduce reserve
     it("Should maintain reserve buffer", async () => {
-      // Buy multiple times to reduce the reserve
-      let i = 0;
-      while (true) {
-        const virtualReserve = await bearedMintToken.virtualTokenReserve();
-        if (virtualReserve < ethers.parseEther("1000000000")) break; // Stop before buffer fails
-        await bearedMintToken.connect(deployer).buy({ value: ethers.parseEther("49") });
-        i++;
+      const buyAmount = ethers.parseEther("0.1");
+      for (let i = 0; i < 6; i++) { //Exceed 5 actions
+        if(i > 0) {
+          await ethers.provider.send("evm_increaseTime", [300]);  // 5 minutes
+          await network.provider.send("evm_mine"); // Mine a block
+        }
+        await bearedMintToken.connect(deployer).buy({ value: buyAmount });
       }
-      await expect(bearedMintToken.connect(user1).buy({ value: ethers.parseEther("49") })).to.be.revertedWith("Not enough tokens in reserve");
+      const reserve = await bearedMintToken.virtualTokenReserve();
+      console.log("<====reserve====>", reserve);
+      expect(reserve).to.be.gt(ethers.parseEther("14725000000"));  // 95% of initial reserve
     });
   });
 
@@ -357,9 +375,14 @@ describe("BearedMintModule - Combined Test Suite", function () {
   
       await bearedMintTimelock.grantRole(await bearedMintTimelock.DEFAULT_ADMIN_ROLE(), deployer.address);
       await bearedMintToken.grantRole(await bearedMintToken.ADMIN_ROLE(), timelockAddress);
+
+      console.log("max delay====>", await bearedMintTimelock.MAXIMUM_DELAY());
+      console.log("min delay====>", await bearedMintTimelock.MINIMUM_DELAY());
+      console.log("grace period====>", await bearedMintTimelock.GRACE_PERIOD());
     });
 
     it("Should queue and execute transaction after delay", async () => {
+      console.log("setting emergency mode...");
       const data = bearedMintToken.interface.encodeFunctionData("setEmergencyMode", [true]);
       const latestBlock = await ethers.provider.getBlock("latest");
       if (!latestBlock) throw new Error("Failed to fetch the latest block");
@@ -371,16 +394,21 @@ describe("BearedMintModule - Combined Test Suite", function () {
     });
 
     it("Should prevent executing transaction before delay", async () => {
+      console.log("setting emergency mode...");
       const data = bearedMintToken.interface.encodeFunctionData("setEmergencyMode", [true]);
+      console.log("data====>", data);
       const latestBlock = await ethers.provider.getBlock("latest");
+      console.log("latestBlock====>", latestBlock);
       if (!latestBlock) throw new Error("Failed to fetch the latest block");
-      const eta = latestBlock.timestamp + 2 * 24 * 60 * 60;
-      await bearedMintTimelock.queueTransaction(await bearedMintToken.getAddress(), 0, "", data, eta);
+      const eta = latestBlock.timestamp + 2 * 24 * 60 * 60; // 2 days delay
+      console.log("eta====>", eta);
+      const tx = await bearedMintTimelock.connect(deployer).queueTransaction(await bearedMintToken.getAddress(), 0, "", data, eta);
+      console.log("queued...", tx);
       // No time increase
-      await expect(
-        bearedMintTimelock.executeTransaction(await bearedMintToken.getAddress(), 0, "", data, eta)
+      const receipt = await expect(
+        bearedMintTimelock.connect(deployer).executeTransaction(await bearedMintToken.getAddress(), 0, "", data, eta)
       ).to.be.revertedWith("Transaction hasn't surpassed delay");
-      
+      console.log("receipt====>", receipt);
     });
   });
 

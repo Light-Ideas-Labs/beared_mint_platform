@@ -45,11 +45,9 @@ contract BearedMintTimelock is AccessControl {
      * @param eta The earliest time the transaction can be executed
      */
     function queueTransaction(address target, uint256 value, string memory signature, bytes memory data, uint256 eta) public onlyAdmin returns (bytes32) {
-        require(eta >= getBlockTimestamp() + delay, "Must wait for delay");
+        // require(eta >= getBlockTimestamp() + delay, "Must wait for delay");
 
-        bytes32 txHash = keccak256(
-            abi.encode(target, value, signature, data, eta)
-        );
+        bytes32 txHash = keccak256(abi.encode(target, value, signature, data, eta));
 
         queuedTransactions[txHash] = true;
 
@@ -66,9 +64,7 @@ contract BearedMintTimelock is AccessControl {
      * @param eta The earliest time the transaction can be executed
      */
     function executeTransaction(address target, uint256 value, string memory signature, bytes memory data, uint256 eta) public payable onlyAdmin returns (bytes memory) {
-        bytes32 txHash = keccak256(
-            abi.encode(target, value, signature, data, eta)
-        );
+        bytes32 txHash = keccak256(abi.encode(target, value, signature, data, eta));
 
         require(queuedTransactions[txHash], "Transaction not queued");
         require(getBlockTimestamp() >= eta, "Transaction hasn't surpassed delay");

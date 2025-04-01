@@ -10,6 +10,8 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 
+import "hardhat/console.sol";
+
 /**
  * @title BearedMintToken 
  * @notice Implementation of a bonding curve token with Uniswap migration capability
@@ -32,7 +34,7 @@ contract BearedMintToken is ERC20, ReentrancyGuard, Pausable, AccessControl {
     error MigrationThreshHoldNotMet();
     error TransferFailed();
 
-    // Role definitions 40000000000000000000 - 19375000000000000000000000 -
+    // Role definitions 40.000.000.000.000.000.000 - 193.750.000.000.000.000.000 -
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
@@ -49,8 +51,8 @@ contract BearedMintToken is ERC20, ReentrancyGuard, Pausable, AccessControl {
     mapping(address => uint256) private _pendingWithdrawals;
 
     // State variables
-    uint256 public virtualTokenReserve;
-    uint256 public virtualEthReserve;
+    uint256 public virtualTokenReserve = INITIAL_VIRTUAL_TOKEN_RESERVE;
+    uint256 public virtualEthReserve = INITIAL_VIRTUAL_ETH_RESERVE;
     uint256 public totalCollectedETH;
     uint256 public activeUserCount;                                   // Track number of active users
 
@@ -109,9 +111,7 @@ contract BearedMintToken is ERC20, ReentrancyGuard, Pausable, AccessControl {
     
     modifier rateLimit(address user) {
         require(
-            block.timestamp - lastActionTime[user] >= RATE_LIMIT_INTERVAL ||
-                actionCounter[user] < MAX_ACTIONS_IN_INTERVAL,
-            "ExceededRateLimit"
+            block.timestamp - lastActionTime[user] >= RATE_LIMIT_INTERVAL || actionCounter[user] < MAX_ACTIONS_IN_INTERVAL, "ExceededRateLimit"
         );
 
         if (block.timestamp - lastActionTime[user] >= RATE_LIMIT_INTERVAL) {
@@ -156,7 +156,7 @@ contract BearedMintToken is ERC20, ReentrancyGuard, Pausable, AccessControl {
     function buy() external payable nonReentrant whenNotPaused whenNotMigrated rateLimit(msg.sender) {
         require(msg.value >= MIN_PURCHASE, "Amount too Low");
         require(msg.value <= MAX_PURCHASE, "Amount exceeds limit");
-        require(activeUserCount < MAX_CONCURRENT_USERS || isActiveUser[msg.sender], "Max users reached");
+        require(activeUserCount < MAX_CONCURRENT_USERS || isActiveUser[msg.sender], "Max users reached"); // Todo: remove the cap
 
         uint256 tokenAmount = calculatePurchaseReturn(msg.value);
         require(tokenAmount > 0, "InvalidAmount");
@@ -166,7 +166,7 @@ contract BearedMintToken is ERC20, ReentrancyGuard, Pausable, AccessControl {
         require(tokenAmount <= maxAllowedPurchase, "Purchase exceeds allowed limit");
  
         // Ensure enough tokens are available with buffer
-        uint256 reserveBuffer = virtualTokenReserve / 2; // 5% buffer
+        uint256 reserveBuffer = virtualTokenReserve / 20; // 5% buffer
         require(virtualTokenReserve >= tokenAmount + reserveBuffer, "Not enough tokens in reserve");
         require(totalSupply() + tokenAmount <= TOTAL_SUPPLY, "Amount exceeds totalsupply");
         
@@ -207,12 +207,13 @@ contract BearedMintToken is ERC20, ReentrancyGuard, Pausable, AccessControl {
         require(balanceOf(msg.sender) >= tokenAmount, "InsufficientBalance");
         uint256 ethAmount = calculateSaleReturn(tokenAmount);
         require(ethAmount > 0, "InvalidAmount");
-        require(virtualEthReserve >= ethAmount && address(this).balance >= ethAmount, "InsufficientBalance");
+        require(virtualEthReserve >= ethAmount, "Insufficient virtual ETH reserve");
+        require(address(this).balance >= ethAmount, "Insufficient contract balance");
         
         _burn(msg.sender, tokenAmount);
-        virtualTokenReserve = virtualTokenReserve + tokenAmount;
-        virtualEthReserve = virtualEthReserve - ethAmount;
-        totalCollectedETH = totalCollectedETH - ethAmount;
+        virtualTokenReserve += tokenAmount; // ToDo: check if this is correct
+        virtualEthReserve -= ethAmount;  // Deduct from virtual reserve
+
         _queueWithdrawal(msg.sender, ethAmount);
         _updateGrowthMetrics(msg.sender);
         
@@ -229,7 +230,7 @@ contract BearedMintToken is ERC20, ReentrancyGuard, Pausable, AccessControl {
     function withdrawPendingPayments() external nonReentrant {
         uint256 amount = _pendingWithdrawals[msg.sender];
         if (amount == 0) {revert NoPendingPayments();}
-        if (address(this).balance < amount) {revert ("Insufficient contract balance");}
+        if (address(this).balance < amount) {revert ("Insufficient contract balance");} // Todo: check if this is correct
 
         _pendingWithdrawals[msg.sender] = 0;
 
@@ -254,7 +255,7 @@ contract BearedMintToken is ERC20, ReentrancyGuard, Pausable, AccessControl {
         require(virtualTokenReserve > 0, "Insufficient token reserve");
 
         // Simplified bonding curve calculation
-        uint256 baseTokenAmount = (ethAmount * virtualTokenReserve) / virtualEthReserve;
+        uint256 baseTokenAmount = (ethAmount * virtualTokenReserve) / virtualEthReserve; // 50 max 
         
         // Apply growth-based adjustments and user count scaling
         uint256 growthMultiplier = 100 + (growthMetrics.communityEngagementScore / 10);
@@ -284,10 +285,15 @@ contract BearedMintToken is ERC20, ReentrancyGuard, Pausable, AccessControl {
         // Simplified sale calculation
         uint256 ethAmount = (tokenAmount * virtualEthReserve) / virtualTokenReserve;
         
-        // Ensure minimum ETH return
-        uint256 minEthAmount = (tokenAmount * 10e18) / (100 * 10e18); // At least 0.01 ETH per 100 tokens
+        // Ensure minimum ETH return - minimum: 0.01 ETH per 100 tokens
+        uint256 minEthAmount = (tokenAmount * 1e16) / 100; // At least 0.01 ETH per 100 tokens  // (tokenAmount * 10e18) / (100 * 10e18);
         if (ethAmount < minEthAmount || ethAmount == 0) {
             ethAmount = minEthAmount;
+        }
+
+        // Cap at available eth reserve
+        if (ethAmount > virtualEthReserve) {
+            ethAmount = virtualEthReserve;
         }
        
         return ethAmount;
